@@ -35,7 +35,7 @@
    <xd:doc>
       <xd:desc>Whether to combine entities over line breaks</xd:desc>
    </xd:doc>
-   <xsl:param name="combine" select="false()"/>
+   <xsl:param name="combine" select="true()"/>
    <xsl:include href="combine-continued.xsl" />
 
    <xd:doc>
@@ -67,7 +67,7 @@
       <xd:desc>Whether to export regions without text lines (true()) or not (false(),
          default)</xd:desc>
    </xd:doc>
-   <xsl:param name="withoutTextline" select="false()"/>
+   <xsl:param name="withoutTextline" select="true()"/>
    
    <xd:doc>
       <xd:desc>Whether to export custom attributes from tags that we do not know how to convert to valid TEI (true(),
@@ -110,16 +110,10 @@
    <xsl:param name="debug" select="false()"/>
 
    <xd:doc>
-      <xd:desc>Entry – note: we also allow execution on a singe PAGE file</xd:desc>
+      <xd:desc>Entry</xd:desc>
    </xd:doc>
    <xsl:template match="/">
       <xsl:apply-templates select="mets:mets" />
-      <xsl:apply-templates select="*/p:Page | */pc:Page" mode="facsimile">
-         <xsl:with-param name="numCurr" tunnel="1" select="*/*:Metadata/*:TranskribusMetadata/@pageNr" />
-      </xsl:apply-templates>
-      <xsl:apply-templates select="*/p:Page | */pc:Page" mode="text">
-         <xsl:with-param name="numCurr" tunnel="1" select="*/*:Metadata/*:TranskribusMetadata/@pageNr" />
-      </xsl:apply-templates>
    </xsl:template>
 
    <xd:doc>
@@ -456,9 +450,9 @@
          <graphic url="{encode-for-uri(@imageFilename)}" width="{@imageWidth}px"
             height="{@imageHeight}px"/>
          <!-- include Transkribus image link as second graphic element for later evaluation -->
-         <xsl:apply-templates
+         <!--<xsl:apply-templates
             select="preceding-sibling::p:Metadata/*:TranskribusMetadata,
-                    preceding-sibling::pc:Metadata/*:TranskribusMetadata"/>
+                    preceding-sibling::pc:Metadata/*:TranskribusMetadata"/>-->
          <xsl:apply-templates
             select="p:PrintSpace | p:TextRegion | p:SeparatorRegion | p:GraphicRegion | p:TableRegion
                   | pc:PrintSpace | pc:TextRegion | pc:SeparatorRegion | pc:GraphicRegion | pc:TableRegion"
@@ -480,11 +474,11 @@
 
       <xsl:variable name="renditionValue">
          <xsl:choose>
+            <xsl:when test="local-name(parent::*) = 'TableCell'">TableCell</xsl:when>
             <xsl:when test="local-name() = 'TextRegion'">TextRegion</xsl:when>
             <xsl:when test="local-name() = 'SeparatorRegion'">Separator</xsl:when>
             <xsl:when test="local-name() = 'GraphicRegion'">Graphic</xsl:when>
             <xsl:when test="local-name() = 'TextLine'">Line</xsl:when>
-            <xsl:when test="local-name(parent::*) = 'TableCell'">TableCell</xsl:when>
             <xsl:otherwise>printspace</xsl:otherwise>
          </xsl:choose>
       </xsl:variable>
@@ -499,10 +493,6 @@
       </xsl:variable>
 
       <xsl:choose>
-         <xsl:when test="(self::p:TextLine or self::pc:TextLine) and (parent::p:TableCell or parent::pc:TableCell)">
-            <xsl:text>
-               </xsl:text>
-         </xsl:when>
          <xsl:when test="self::p:TextLine or self::pc:TextLine">
             <xsl:text>
             </xsl:text>
@@ -575,30 +565,11 @@
    <xsl:template match="p:TableRegion | pc:TableRegion" mode="facsimile">
       <xsl:param name="numCurr" tunnel="true"/>
 
-      <xsl:text>
-         </xsl:text>
       <zone points="{(p:Coords/@points, pc:Coords/@points)}" rendition="Table">
          <xsl:attribute name="xml:id">
             <xsl:value-of select="'facs_' || $numCurr || '_' || @id"/>
          </xsl:attribute>
-         <xsl:apply-templates select="p:TableCell | pc:TableCell" mode="facsimile"/>
-         <xsl:text>
-         </xsl:text>
-      </zone>
-   </xsl:template>
-   
-   <xsl:template match="p:TableCell | pc:TableCell" mode="facsimile">
-      <xsl:param name="numCurr" tunnel="true"/>
-      
-      <xsl:text>
-            </xsl:text>
-      <zone points="{(p:Coords/@points, pc:Coords/@points)}" rendition="TableCell">
-         <xsl:attribute name="xml:id">
-            <xsl:value-of select="'facs_' || $numCurr || '_' || @id"/>
-         </xsl:attribute>
-         <xsl:apply-templates select="p:TextLine | pc:TextLine" mode="facsimile" />
-         <xsl:text>
-            </xsl:text>
+         <xsl:apply-templates select="p:TableCell//p:TextLine | pc:TableCell//pc:TextLine" mode="facsimile"/>
       </zone>
    </xsl:template>
 
@@ -640,6 +611,25 @@
       <xsl:variable name="regionType" as="xs:string*" select="(@type, $custom?structure?type)" />
 
       <xsl:choose>
+         <!-- place notatedMusic before the following rule to not loose the music -->
+         <!--<xsl:when test="'notatedMusic' = $regionType and not($ab) and text()">
+            <notatedMusic facs="#facs_{$numCurr}_{@id}">
+               <desc>.</desc>
+               <graphic url="example.xml"/>
+            </notatedMusic>
+         </xsl:when>-->
+         <xsl:when test="'notatedMusic' = $regionType and not($ab) and $withoutTextline">
+            <notatedMusic facs="#facs_{$numCurr}_{@id}">
+               <graphic url="example.xml"/>
+            </notatedMusic>
+         </xsl:when>
+         <!--<xsl:when test="'notatedMusic' = $regionType and not($ab) and text()">
+            <notatedMusic facs="#facs_{$numCurr}_{@id}">
+               <desc>.</desc>
+               <graphic url="example.xml"/>
+            </notatedMusic>-->
+         <!--</xsl:when>-->
+         <!-- Rule for dropping zones without Textlines -->
          <xsl:when test="not(p:TextLine or pc:TextLine or $withoutTextline)"/>
          <xsl:when test="'heading' = $regionType">
             <head facs="#facs_{$numCurr}_{@id}">
@@ -729,11 +719,19 @@
                <xsl:apply-templates select="p:TextLine | pc:TextLine"/>
             </p>
          </xsl:when>
+         <xsl:when test="'continued' = $regionType">
+            <xsl:text>
+            </xsl:text>
+            <p type="continued" facs="#facs_{$numCurr}_{@id}">
+               <xsl:apply-templates select="p:TextLine | pc:TextLine"/>
+            </p>
+         </xsl:when>
          <!-- the fallback option should be a semantically open element such as <ab> -->
+         <!-- rw change : deleted the type attribute to avoid empty type element type="{(@type,$custom?structure?type)[normalize-space() != ''][1]}" -->
          <xsl:otherwise>
             <xsl:text>
             </xsl:text>
-            <ab facs="#facs_{$numCurr}_{@id}" type="{(@type,$custom?structure?type)[normalize-space() != ''][1]}">
+            <ab facs="#facs_{$numCurr}_{@id}">
                <xsl:apply-templates select="p:TextLine | pc:TextLine"/>
                <xsl:text>
             </xsl:text>
@@ -955,7 +953,7 @@
                <xsl:variable name="pos"
                   select="xs:integer(substring-before(substring-after(@custom, 'index:'), ';')) + 1"/>
                <xsl:attribute name="n">
-                  <xsl:text>N</xsl:text>
+                  <!--<xsl:text>N</xsl:text>-->
                   <xsl:value-of select="format-number($pos, '000')"/>
                </xsl:attribute>
             </xsl:if>
@@ -972,7 +970,6 @@
       <xd:desc>Starting milestones for (possibly nested) elements</xd:desc>
    </xd:doc>
    <xsl:template match="local:m[@pos = 's']">
-      <xsl:param name="numCurr" tunnel="true" />
       <xsl:variable name="o" select="@o"/>
       <xsl:variable name="custom" as="map(*)">
          <xsl:map>
@@ -1170,13 +1167,7 @@
             <xsl:element name="{@type}">
                <xsl:for-each select="map:keys($custom)">
                   <xsl:if test="not(. = ('', 'length'))">
-                     <xsl:try>
-                        <xsl:attribute name="{.}" select="$custom(.)"/>
-                        <xsl:catch>
-                           <xsl:message select="string($o)" />
-                           <xsl:message select="string($numCurr)"/>
-                        </xsl:catch>
-                     </xsl:try>
+                     <xsl:attribute name="{.}" select="$custom(.)"/>
                   </xsl:if>
                </xsl:for-each>
                <xsl:call-template name="elem">
@@ -1245,11 +1236,10 @@
          </xsl:for-each>
       </xsl:map>
    </xsl:template>
-
    <xd:doc>
-      <xd:desc>Text nodes to be copied – we replace U+xA0 by a regular space U+x20</xd:desc>
+      <xd:desc>Text nodes to be copied</xd:desc>
    </xd:doc>
    <xsl:template match="text()">
-      <xsl:value-of select="translate(., '', ' ')"/>
+      <xsl:value-of select="."/>
    </xsl:template>
 </xsl:stylesheet>
